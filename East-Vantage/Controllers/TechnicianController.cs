@@ -9,20 +9,64 @@ using System.Net.Http;
 using System.Web.Http;
 using System.Web.Http.Description;
 using East_Vantage.Models;
+using Newtonsoft.Json;
+using NLog;
 
 namespace East_Vantage.Controllers
 {
     public class TechnicianController : ApiController
     {
+        #region DB context and Logging
         private EastContext db = new EastContext();
+        private static Logger logger = LogManager.GetCurrentClassLogger();
+        #endregion
 
+        #region GET Methods
+
+        //Get all active technicians
         [HttpGet]
         [Route("GetActiveTechnicians")]
         public List<tbl_Technician> GetActiveTechnicians()
         {
-            return db.tbl_Technicians.Where(x => x.Active == true).ToList();
+            try
+            {
+                return db.tbl_Technicians.Where(x => x.Active == true).ToList();
+            }
+            catch (Exception ex)
+            {
+                logger.Error($"TechnicianController_GetActiveTechnicians : An exception has been generated {ex}");
+                return new List<tbl_Technician>();
+            }
         }
 
+        //Get technician by reference/technician id
+        [HttpGet]
+        [Route("GetTechnicianByRefId")]
+        [ResponseType(typeof(tbl_Technician))]
+        public IHttpActionResult GetTechnicianByRefId(string refId)
+        {
+            try
+            {
+                tbl_Technician tbl_Technician = db.tbl_Technicians.Find(refId);
+                if (tbl_Technician == null)
+                {
+                    return NotFound();
+                }
+
+                return Ok(tbl_Technician);
+            }
+            catch (Exception ex)
+            {
+                logger.Error($"TechnicianController_GetTechnicianByRefId : An exception has been generated {ex} with id : {refId}");
+                return BadRequest(message: "An error has occured.");
+            }
+        }
+
+        #endregion
+
+        #region POST Method
+
+        //Add technician
         [HttpPost]
         [Route("AddTechnician")]
         [ResponseType(typeof(tbl_Technician))]
@@ -48,7 +92,7 @@ namespace East_Vantage.Controllers
             {
                 db.SaveChanges();
             }
-            catch (DbUpdateException)
+            catch (DbUpdateException ex)
             {
                 if (TechnicianExists(tbl_Technician.TechnicianId))
                 {
@@ -56,13 +100,19 @@ namespace East_Vantage.Controllers
                 }
                 else
                 {
-                    throw;
+                    logger.Error($"TechnicianController_AddTechnician : An exception has been generated {ex} for model : " + JsonConvert.SerializeObject(tbl_Technician));
+                    return BadRequest(message: "An error has occured.");
                 }
             }
 
             return CreatedAtRoute("DefaultApi", new { id = tbl_Technician.TechnicianId }, tbl_Technician);
         }
 
+        #endregion
+
+        #region PUT Methods
+
+        //Deactivate technician by reference/technician id
         [HttpPut]
         [Route("DeactivateTechnician")]
         [ResponseType(typeof(void))]
@@ -81,28 +131,17 @@ namespace East_Vantage.Controllers
             {
                 db.SaveChanges();
             }
-            catch (DbUpdateConcurrencyException)
+            catch (DbUpdateConcurrencyException ex)
             {
-                throw;
+                logger.Error($"TechnicianController_DeactivateTechnician : An exception has been generated {ex} for refId : {refId}");
+                return BadRequest(message: "An error has occured.");
             }
 
             return StatusCode(HttpStatusCode.NoContent);
         }
 
-        [HttpGet]
-        [Route("GetTechnicianByRefId")]
-        [ResponseType(typeof(tbl_Technician))]
-        public IHttpActionResult GetTechnicianByRefId(string refId)
-        {
-            tbl_Technician tbl_Technician = db.tbl_Technicians.Find(refId);
-            if (tbl_Technician == null)
-            {
-                return NotFound();
-            }
 
-            return Ok(tbl_Technician);
-        }
-
+        //Edit technician 
         [HttpPut]
         [Route("EditTechnician")]
         [ResponseType(typeof(void))]
@@ -134,7 +173,7 @@ namespace East_Vantage.Controllers
             {
                 db.SaveChanges();
             }
-            catch (DbUpdateConcurrencyException)
+            catch (DbUpdateConcurrencyException ex)
             {
                 if (!TechnicianExists(tbl_Technician.TechnicianId))
                 {
@@ -142,27 +181,43 @@ namespace East_Vantage.Controllers
                 }
                 else
                 {
-                    throw;
+                    logger.Error($"TechnicianController_EditTechnician : An exception has been generated {ex} for model : " + JsonConvert.SerializeObject(tbl_Technician));
+                    return BadRequest(message: "An error has occured.");
                 }
             }
 
             return StatusCode(HttpStatusCode.NoContent);
         }
 
+        #endregion
+
+        #region DELETE Method
+
+        //Delete technician by reference/technician id
         [ResponseType(typeof(tbl_Technician))]
         public IHttpActionResult Delete(string id)
         {
-            tbl_Technician tbl_Technician = db.tbl_Technicians.Find(id);
-            if (tbl_Technician == null)
+            try
             {
-                return NotFound();
+                tbl_Technician tbl_Technician = db.tbl_Technicians.Find(id);
+                if (tbl_Technician == null)
+                {
+                    return NotFound();
+                }
+
+                db.tbl_Technicians.Remove(tbl_Technician);
+                db.SaveChanges();
+
+                return Ok(tbl_Technician);
             }
-
-            db.tbl_Technicians.Remove(tbl_Technician);
-            db.SaveChanges();
-
-            return Ok(tbl_Technician);
+            catch (Exception ex)
+            {
+                logger.Error($"TechnicianController_DeactivateTechnician : An exception has been generated {ex} for id : {id}");
+                return BadRequest(message: "An error has occured.");
+            }
         }
+
+        #endregion
 
         protected override void Dispose(bool disposing)
         {
