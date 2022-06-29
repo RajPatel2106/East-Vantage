@@ -163,7 +163,7 @@ namespace East_Vantage.Controllers
             }
             catch (DbUpdateConcurrencyException)
             {
-                if (!WorkOrderExists(id))
+                if (!WorkOrderExists(tbl_WorkOrder.WorkOrderId))
                 {
                     return NotFound();
                 }
